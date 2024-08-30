@@ -1,88 +1,43 @@
 import asyncio
-from homeassistant.components import bluetooth
-from homeassistant.exceptions import ConfigEntryNotReady
-from homeassistant.components.light import (ColorMode)
+from collections.abc import Callable
+
+# import traceback
+import logging
+from typing import Any, TypeVar, cast
+
 from bleak.backends.device import BLEDevice
-from bleak.backends.service import BleakGATTCharacteristic, BleakGATTServiceCollection
+from bleak.backends.service import BleakGATTServiceCollection
 from bleak.exc import BleakDBusError
-from bleak_retry_connector import BLEAK_RETRY_EXCEPTIONS as BLEAK_EXCEPTIONS
 from bleak_retry_connector import (
+    BLEAK_RETRY_EXCEPTIONS as BLEAK_EXCEPTIONS,
     BleakClientWithServiceCache,
-    #BleakError,
+    # BleakError,
     BleakNotFoundError,
-    #ble_device_has_changed,
+    # ble_device_has_changed,
     establish_connection,
 )
-from typing import Any, TypeVar, cast, Tuple
-from collections.abc import Callable
-#import traceback
-import logging
-import colorsys
 
+from homeassistant.components import bluetooth
+from homeassistant.components.light import ColorMode
+from homeassistant.exceptions import ConfigEntryNotReady
 
 LOGGER = logging.getLogger(__name__)
 
-EFFECT_0x03_0x00 = "Colorloop"
-EFFECT_0x03_0x01 = "Red fade"
-EFFECT_0x03_0x02 = "Green fade"
-EFFECT_0x03_0x03 = "Blue fade"
-EFFECT_0x03_0x04 = "Yellow fade"
-EFFECT_0x03_0x05 = "Cyan fade"
-EFFECT_0x03_0x06 = "Magenta fade"
-EFFECT_0x03_0x07 = "White fade"
-EFFECT_0x03_0x08 = "Red green cross fade"
-EFFECT_0x03_0x09 = "Red blue cross fade"
-EFFECT_0x03_0x0a = "Green blue cross fade"
-EFFECT_0x03_0x0b = "Rainbow fade"
-EFFECT_0x03_0x0c = "Color strobe"
-EFFECT_0x03_0x0d = "Red strobe"
-EFFECT_0x03_0x0e = "Green strobe"
-EFFECT_0x03_0x0f = "Blue strobe"
-EFFECT_0x03_0x10 = "Yellow strobe"
-EFFECT_0x03_0x11 = "Cyan strobe"
-EFFECT_0x03_0x12 = "Magenta strobe"
-EFFECT_0x03_0x13 = "White strobe"
-EFFECT_0x03_0x14 = "Color jump"
-EFFECT_0x03_0x15 = "RGB jump"
+from .effects import effects_dmx as EFFECT_MAP
 
+EFFECT_LIST = list(EFFECT_MAP.keys())
 
-EFFECT_MAP = {
-    EFFECT_0x03_0x00:    (0x03,0x00),
-    EFFECT_0x03_0x01:    (0x03,0x01),
-    EFFECT_0x03_0x02:    (0x03,0x02),
-    EFFECT_0x03_0x03:    (0x03,0x03),
-    EFFECT_0x03_0x04:    (0x03,0x04),
-    EFFECT_0x03_0x05:    (0x03,0x05),
-    EFFECT_0x03_0x06:    (0x03,0x06),
-    EFFECT_0x03_0x07:    (0x03,0x07),
-    EFFECT_0x03_0x08:    (0x03,0x08),
-    EFFECT_0x03_0x09:    (0x03,0x09),
-    EFFECT_0x03_0x0a:    (0x03,0x0a),
-    EFFECT_0x03_0x0b:    (0x03,0x0b),
-    EFFECT_0x03_0x0c:    (0x03,0x0c),
-    EFFECT_0x03_0x0d:    (0x03,0x0d),
-    EFFECT_0x03_0x0e:    (0x03,0x0e),
-    EFFECT_0x03_0x0f:    (0x03,0x0f),
-    EFFECT_0x03_0x10:    (0x03,0x10),
-    EFFECT_0x03_0x11:    (0x03,0x11),
-    EFFECT_0x03_0x12:    (0x03,0x12),
-    EFFECT_0x03_0x13:    (0x03,0x13),
-    EFFECT_0x03_0x14:    (0x03,0x14),
-    EFFECT_0x03_0x15:    (0x03,0x15)
-}
+NAME_ARRAY = ["LEDDMX-03-DD2B"]
+WRITE_CHARACTERISTIC_UUIDS = ["0000ffe1-0000-1000-8000-00805f9b34fb"]
 
-EFFECT_LIST = sorted(EFFECT_MAP)
-EFFECT_ID_NAME = {v: k for k, v in EFFECT_MAP.items()}
-
-NAME_ARRAY = ["BJ_LED"]
-WRITE_CHARACTERISTIC_UUIDS = ["0000ee01-0000-1000-8000-00805f9b34fb"]
-TURN_ON_CMD  = [bytearray.fromhex("69 96 02 01 01")]
-TURN_OFF_CMD = [bytearray.fromhex("69 96 02 01 00")]
+TURN_ON_CMD = [bytearray.fromhex("7b ff 07 00 00 ff 00 ff bf")]
+TURN_OFF_CMD = [bytearray.fromhex("7b ff 07 00 00 00 00 ff bf")]
 DEFAULT_ATTEMPTS = 3
 BLEAK_BACKOFF_TIME = 0.25
-RETRY_BACKOFF_EXCEPTIONS = (BleakDBusError)
+RETRY_BACKOFF_EXCEPTIONS = BleakDBusError
 
 WrapFuncType = TypeVar("WrapFuncType", bound=Callable[..., Any])
+
 
 def retry_bluetooth_connection_error(func: WrapFuncType) -> WrapFuncType:
     async def _async_wrap_retry_bluetooth_connection_error(
@@ -176,7 +131,7 @@ class BJLEDInstance:
         self._turn_on_cmd = None
         self._turn_off_cmd = None
         self._model = self._detect_model()
-        
+
         LOGGER.debug(
             "Model information for device %s : ModelNo %s. MAC: %s",
             self._device.name,
@@ -201,7 +156,7 @@ class BJLEDInstance:
     async def _write_while_connected(self, data: bytearray):
         LOGGER.debug(f"Writing data to {self.name}: {data.hex()}")
         await self._client.write_gatt_char(self._write_uuid, data, False)
-    
+
     @property
     def mac(self):
         return self._device.address
@@ -224,7 +179,7 @@ class BJLEDInstance:
 
     @property
     def brightness(self):
-        return self._brightness 
+        return self._brightness
 
     @property
     def rgb_color(self):
@@ -237,13 +192,15 @@ class BJLEDInstance:
     @property
     def effect(self):
         return self._effect
-    
+
     @property
     def color_mode(self):
         return self._color_mode
 
     @retry_bluetooth_connection_error
-    async def set_rgb_color(self, rgb: Tuple[int, int, int], brightness: int | None = None):
+    async def set_rgb_color(
+        self, rgb: tuple[int, int, int], brightness: int | None = None
+    ):
         self._rgb_color = rgb
         if brightness is None:
             if self._brightness is None:
@@ -256,10 +213,12 @@ class BJLEDInstance:
         green = int(rgb[1] * brightness_percent / 100)
         blue = int(rgb[2] * brightness_percent / 100)
         # RGB packet
-        rgb_packet = bytearray.fromhex("69 96 05 02")
+        rgb_packet = bytearray.fromhex("7b ff 07")
         rgb_packet.append(red)
         rgb_packet.append(green)
         rgb_packet.append(blue)
+        rgb_packet.extend(bytearray.fromhex("00 ff bf"))
+        LOGGER.info("RGB Packet: %s", rgb_packet.hex())
         await self._write(rgb_packet)
 
     async def set_brightness_local(self, value: int):
@@ -272,7 +231,7 @@ class BJLEDInstance:
     async def turn_on(self):
         await self._write(self._turn_on_cmd)
         self._is_on = True
-                
+
     @retry_bluetooth_connection_error
     async def turn_off(self):
         await self._write(self._turn_off_cmd)
@@ -284,14 +243,13 @@ class BJLEDInstance:
             LOGGER.error("Effect %s not supported", effect)
             return
         self._effect = effect
-        effect_packet = bytearray.fromhex("69 96 03")
+        
         effect_id = EFFECT_MAP.get(effect)
-        LOGGER.debug('Effect ID: %s', effect_id)
-        LOGGER.debug('Effect name: %s', effect)
-        effect_packet.append(effect_id[0])
-        effect_packet.append(effect_id[1])
-        effect_packet.append(0x03) # Between 0 and 10
-        await self._write(effect_packet)
+        hex_cmd = f"7b ff 03 {effect_id:02x} ff ff ff ff bf"
+        LOGGER.debug("Effect ID: %s", effect_id)
+        LOGGER.debug("Effect name: %s", effect)
+        LOGGER.debug("Effect hex_cmd: %s", hex_cmd)
+        await self._write(bytearray.fromhex(hex_cmd))
 
     @retry_bluetooth_connection_error
     async def turn_on(self):
@@ -336,7 +294,7 @@ class BJLEDInstance:
             resolved = self._resolve_characteristics(client.services)
             if not resolved:
                 # Try to handle services failing to load
-                #resolved = self._resolve_characteristics(await client.get_services())
+                # resolved = self._resolve_characteristics(await client.get_services())
                 resolved = self._resolve_characteristics(client.services)
             self._cached_services = client.services if resolved else None
 
@@ -360,7 +318,7 @@ class BJLEDInstance:
             LOGGER.debug(
                 "%s: Configured disconnect from device in %s seconds",
                 self.name,
-                self._delay
+                self._delay,
             )
             self._disconnect_timer = self.loop.call_later(self._delay, self._disconnect)
 
@@ -383,11 +341,7 @@ class BJLEDInstance:
 
     async def _execute_timed_disconnect(self) -> None:
         """Execute timed disconnection."""
-        LOGGER.debug(
-            "%s: Disconnecting after timeout of %s",
-            self.name,
-            self._delay
-        )
+        LOGGER.debug("%s: Disconnecting after timeout of %s", self.name, self._delay)
         await self._execute_disconnect()
 
     async def _execute_disconnect(self) -> None:
@@ -400,4 +354,3 @@ class BJLEDInstance:
             if client and client.is_connected:
                 await client.disconnect()
             LOGGER.debug("%s: Disconnected", self.name)
-    

@@ -1,12 +1,9 @@
-# BJ_LED
+# LED LAMP
 
-Home Assistant custom integration for BJ_LED devices controlled by the MohuanLED app over Bluetooth LE.
+Home Assistant custom integration for LED LAMP devices controlled by the MohuanLED app over Bluetooth LE.
 
-These were the cheapest Bluetooth controlled LEDs I could find on AliExpress.  5M of 5050 LEDs for £2.67.  The app is basic, but it works.  The IR remote is basic, but it works.  The lights connect to a USB port.
+https://play.google.com/store/apps/details?id=com.ledlamp&hl=en_US
 
-![image](https://github.com/8none1/bj_led/assets/6552931/686eff8b-ab87-4327-b784-ed91d695f957)
-
-![image](https://github.com/8none1/bj_led/assets/6552931/74e43dbb-92ab-4d58-bf10-55d789e259d4)
 
 I figured it should be pretty easy to get them working, and it was.  I have no intention of adding this to HACS in any official capacity, but it should work when you add this repo as a custom repo in HACS.
 
@@ -14,46 +11,79 @@ There are some btsnoop HCI logs in the `bt_snoops` folder if you want to examine
 
 ## Bluetooth LE commands
 
-`69 96 06 01 01`                 - On
-`69 96 02 01 00`                 - Off
+`7b ff 07 00 00 ff 00 ff bf`                 - On
+`7b ff 07 00 00 00 00 ff bf`                 - Off
 
-### Colours
+# Payload Structure Breakdown
 
-```
-|---------| -------------------- header
-|         | ||------------------ red
-|         | || ||--------------- green
-|         | || || ||------------ blue
-|         | || || || ||--------- white
-69 96 05 02 7f 00 00 7f        - red
-69 96 05 02 00 7f 00 7f        - green
-69 96 05 02 00 00 7f 7f        - blue
-69 96 05 02 ff ff ff ff        - white
-```
+| Byte Offset | Byte Value(s) | Explanation                                                                                                                                                             |
+| ----------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0-3         | `7bff`        | **Static Prefix**: This part of the payload is constant and likely signifies the start of a control command.                                                            |
+| 4-5         | `07`          | **Mode Identifier**: This byte seems to indicate the control mode, typically related to color or brightness.                                                            |
+| 6-7         | `ff`          | **Intensity/Effect Modifier**: This byte often relates to the intensity or effect within the mode, but may not directly control brightness when scaling the RGB values. |
+| 8-9         | `XX`          | **Red (R) Channel**: This byte represents the intensity of the red color in the RGB model. It is scaled according to the brightness level.                              |
+| 10-11       | `XX`          | **Green (G) Channel**: This byte represents the intensity of the green color in the RGB model. It is scaled according to the brightness level.                          |
+| 12-13       | `XX`          | **Blue (B) Channel**: This byte represents the intensity of the blue color in the RGB model. It is scaled according to the brightness level.                            |
+| 14-15       | `00`          | **Control Padding**: This byte appears to be fixed and acts as padding, likely unrelated to color or brightness.                                                        |
+| 16-17       | `ff`          | **Control Byte**: This byte seems related to finalizing the color or effect, often seen as constant but possibly involved in handling effect transitions.               |
+| 18-19       | `bf`          | **Static Suffix**: The command ends with this static value, which likely signifies the end of the command.                                                              |
 
-In fact, you only need to provide RGB and can skip the last byte.  Since these strips don't have an white LED, it's easier to make sense of the shorter packet.
+# Payload Example Breakdown
 
-### Mode
+### Example 1: Full Brightness (RGB: Red `ff0000`, Brightness: 100%)
 
-```
-|-----|------------------------- header
-|     |     |------------------- mode
-|     |     |  ||--------------- speed
-69 96 03 03 02 01
-69 96 03 03 01 01
-```
+- **Payload**: `7bff07ffff0000ffbf`
 
-Mode are numbered `00` to `15`.
+| Byte Offset | Byte Value | Meaning              |
+| ----------- | ---------- | -------------------- |
+| 0-3         | `7bff`     | Static Prefix        |
+| 4-5         | `07`       | Mode Identifier      |
+| 6-7         | `ff`       | Intensity Modifier   |
+| 8-9         | `ff`       | Red Channel (full)   |
+| 10-11       | `00`       | Green Channel (none) |
+| 12-13       | `00`       | Blue Channel (none)  |
+| 14-15       | `00`       | Control Padding      |
+| 16-17       | `ff`       | Control Byte         |
+| 18-19       | `bf`       | Static Suffix        |
 
-Speed is 01 fast to 0a slow.  There are values accepted above this, but strange things happen.
+### Example 2: 50% Brightness (RGB: Green `00ff00`, Brightness: 50%)
 
-## Supported devices
+- **Payload**: `7bff0780008000ffbf`
 
-This has only been tested with a single generic LED strip from Ali Express.
+| Byte Offset | Byte Value | Meaning                    |
+| ----------- | ---------- | -------------------------- |
+| 0-3         | `7bff`     | Static Prefix              |
+| 4-5         | `07`       | Mode Identifier            |
+| 6-7         | `80`       | Intensity Modifier (50%)   |
+| 8-9         | `00`       | Red Channel (none)         |
+| 10-11       | `80`       | Green Channel (50% scaled) |
+| 12-13       | `00`       | Blue Channel (none)        |
+| 14-15       | `00`       | Control Padding            |
+| 16-17       | `ff`       | Control Byte               |
+| 18-19       | `bf`       | Static Suffix              |
 
-It reports itself as `BJ_LED` over Bluetooth LE.  The app is called `MohuanLED`.
-MAC address seem to start `FF:FF:xx:xx:xx:xx`.
+### Example 3: 10% Brightness (RGB: Blue `0000ff`, Brightness: 10%)
 
+- **Payload**: `7bff07330333ffbf`
+
+| Byte Offset | Byte Value | Meaning                   |
+| ----------- | ---------- | ------------------------- |
+| 0-3         | `7bff`     | Static Prefix             |
+| 4-5         | `07`       | Mode Identifier           |
+| 6-7         | `33`       | Intensity Modifier (10%)  |
+| 8-9         | `00`       | Red Channel (none)        |
+| 10-11       | `00`       | Green Channel (none)      |
+| 12-13       | `33`       | Blue Channel (10% scaled) |
+| 14-15       | `00`       | Control Padding           |
+| 16-17       | `ff`       | Control Byte              |
+| 18-19       | `bf`       | Static Suffix             |
+
+# Summary
+
+- **Prefix** (`7bff`): Always static and signals the beginning of the payload.
+- **Mode Identifier** (`07`): Identifies the operation mode (RGB color control in this case).
+- **RGB Channels**: Bytes at positions 8-13 represent the RGB values, which are scaled according to brightness.
+- **Suffix** (`bf`): The static ending that likely completes the command.
 ## Supported Features in this integration
 
 - On/Off
