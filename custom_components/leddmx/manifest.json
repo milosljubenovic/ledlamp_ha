@@ -2,7 +2,7 @@
   "domain": "leddmx",
   "name": "LEDDMX BLE",
   "bluetooth": [
-      { "local_name": "LEDDMX" }
+      { "local_name": "LEDDMX*" }
     ],
   "codeowners": ["@8none1"],
   "config_flow": true,

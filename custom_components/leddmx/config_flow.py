@@ -9,8 +9,10 @@ import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.components.bluetooth import (
+    BluetoothScanningMode,
     BluetoothServiceInfoBleak,
     async_discovered_service_info,
+    async_register_callback,
 )
 from homeassistant.const import CONF_MAC
 from homeassistant.core import callback
@@ -30,7 +32,10 @@ class DeviceData(BluetoothData):
         # LOGGER.debug("Discovered bluetooth devices, DeviceData, : %s , %s", self._discovery.address, self._discovery.name)
 
     def supported(self):
-        return self._discovery.name.lower().startswith("leddmx-")
+        return (
+            self._discovery.name is not None
+            and self._discovery.name.lower().startswith("leddmx-")
+        )
 
     def address(self):
         return self._discovery.address
@@ -60,7 +65,8 @@ class BJLEDFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         self.name = None
         self._discovery_info: BluetoothServiceInfoBleak | None = None
         self._discovered_device: DeviceData | None = None
-        self._discovered_devices = []
+        self._discovered_devices: list[DeviceData] = []
+        self._scan_task: asyncio.Task[None] | None = None
 
     async def async_step_bluetooth(
         self, discovery_info: BluetoothServiceInfoBleak
@@ -116,19 +122,15 @@ class BJLEDFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             if self.mac in current_addresses:
                 LOGGER.debug("Device %s in current_addresses", (self.mac))
                 continue
-            if (
-                device
-                for device in self._discovered_devices
-                if device.address == self.mac
-            ) == ([]):
-                LOGGER.debug("Device %s in discovered_devices", (device))
+            if any(dev.address() == self.mac for dev in self._discovered_devices):
+                LOGGER.debug("Device %s already in discovered_devices", (self.mac))
                 continue
             device = DeviceData(discovery_info)
             if device.supported():
                 self._discovered_devices.append(device)
 
         if not self._discovered_devices:
-            return await self.async_step_manual()
+            return await self.async_step_discover()
 
         LOGGER.debug(
             "Discovered supported devices: %s - %s",
@@ -173,6 +175,70 @@ class BJLEDFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=vol.Schema({vol.Required("flicker"): bool}),
             errors={},
         )
+
+    async def async_step_discover(
+        self, user_input: "dict[str, Any] | None" = None
+    ) -> FlowResult:
+        """Handle the discover step when no devices found initially."""
+        self._set_confirm_only()
+        return self.async_show_menu(
+            step_id="discover",
+            menu_options=["scanning", "manual"],
+            description_placeholders={},
+        )
+
+    async def _async_scan_for_devices(self) -> None:
+        """Register callback and collect LEDDMX devices for a period."""
+        discovered: dict[str, DeviceData] = {}
+        scan_duration = 15
+
+        @callback
+        def _async_on_device(
+            service_info: BluetoothServiceInfoBleak, change: Any
+        ) -> None:
+            if service_info.address in discovered:
+                return
+            device = DeviceData(service_info)
+            if device.supported():
+                discovered[service_info.address] = device
+
+        cancel = async_register_callback(
+            self.hass,
+            _async_on_device,
+            {"local_name": "LEDDMX*"},
+            BluetoothScanningMode.ACTIVE,
+        )
+        try:
+            await asyncio.sleep(scan_duration)
+        finally:
+            cancel()
+
+        self._discovered_devices = list(discovered.values())
+
+    async def async_step_scanning(
+        self, user_input: "dict[str, Any] | None" = None
+    ) -> FlowResult:
+        """Show progress while scanning for BLE devices."""
+        if self._scan_task is None:
+            self._scan_task = self.hass.async_create_task(
+                self._async_scan_for_devices()
+            )
+
+        if not self._scan_task.done():
+            return self.async_show_progress(
+                step_id="scanning",
+                progress_action="scanning",
+                progress_task=self._scan_task,
+            )
+
+        try:
+            await self._scan_task
+        finally:
+            self._scan_task = None
+
+        if self._discovered_devices:
+            return self.async_show_progress_done(next_step_id="user")
+        return self.async_show_progress_done(next_step_id="discover")
 
     async def async_step_manual(self, user_input: "dict[str, Any] | None" = None):
         if user_input is not None:
