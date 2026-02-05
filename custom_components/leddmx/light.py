@@ -26,7 +26,6 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({vol.Required(CONF_MAC): cv.string})
 
 async def async_setup_entry(hass, config_entry, async_add_devices):
     instance = hass.data[DOMAIN][config_entry.entry_id]
-    await instance.update()
     async_add_devices(
         [BJLEDLight(instance, config_entry.data["name"], config_entry.entry_id)]
     )

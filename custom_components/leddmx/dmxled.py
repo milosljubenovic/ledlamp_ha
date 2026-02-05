@@ -315,7 +315,10 @@ class BJLEDInstance:
         if self._expected_disconnect:
             LOGGER.debug("%s: Disconnected from device", self.name)
             return
-        LOGGER.warning("%s: Device unexpectedly disconnected", self.name)
+        LOGGER.debug(
+            "%s: Device unexpectedly disconnected (common with BLE, will reconnect on next use)",
+            self.name,
+        )
 
     def _disconnect(self) -> None:
         """Disconnect from device."""

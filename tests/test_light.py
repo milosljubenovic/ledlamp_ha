@@ -183,8 +183,7 @@ async def test_async_setup_entry(hass, mock_config_entry, mock_bjled_instance):
     async_add_devices = MagicMock()
     
     await async_setup_entry(hass, mock_config_entry, async_add_devices)
-    
-    mock_bjled_instance.update.assert_called_once()
+
     async_add_devices.assert_called_once()
     assert len(async_add_devices.call_args[0][0]) == 1
     assert isinstance(async_add_devices.call_args[0][0][0], BJLEDLight)
