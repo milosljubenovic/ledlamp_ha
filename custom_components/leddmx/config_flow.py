@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from typing import Any
 
@@ -20,7 +19,6 @@ from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.device_registry import format_mac
 
 from .const import CONF_DELAY, CONF_RESET, DOMAIN
-from .dmxled import BJLEDInstance
 
 LOGGER = logging.getLogger(__name__)
 DATA_SCHEMA = vol.Schema({("host"): str})
@@ -61,7 +59,6 @@ class BJLEDFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         self.mac = None
         self._device = None
-        self._instance = None
         self.name = None
         self._discovery_info: BluetoothServiceInfoBleak | None = None
         self._discovered_device: DeviceData | None = None
@@ -114,7 +111,9 @@ class BJLEDFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                 self.name = "LEDDMX"
             await self.async_set_unique_id(self.mac, raise_on_progress=False)
             self._abort_if_unique_id_configured()
-            return await self.async_step_validate()
+            return self.async_create_entry(
+                title=self.name, data={CONF_MAC: self.mac, "name": self.name}
+            )
 
         current_addresses = self._async_current_ids()
         for discovery_info in async_discovered_service_info(self.hass):
@@ -146,33 +145,6 @@ class BJLEDFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Required(CONF_MAC): vol.In(mac_dict),
                 }
             ),
-            errors={},
-        )
-
-    async def async_step_validate(self, user_input: "dict[str, Any] | None" = None):
-        if user_input is not None:
-            if "flicker" in user_input:
-                if user_input["flicker"]:
-                    return self.async_create_entry(
-                        title=self.name, data={CONF_MAC: self.mac, "name": self.name}
-                    )
-                return self.async_abort(reason="cannot_validate")
-
-            if "retry" in user_input and not user_input["retry"]:
-                return self.async_abort(reason="cannot_connect")
-
-        error = await self.toggle_light()
-
-        if error:
-            return self.async_show_form(
-                step_id="validate",
-                data_schema=vol.Schema({vol.Required("retry"): bool}),
-                errors={"base": "connect"},
-            )
-
-        return self.async_show_form(
-            step_id="validate",
-            data_schema=vol.Schema({vol.Required("flicker"): bool}),
             errors={},
         )
 
@@ -245,7 +217,10 @@ class BJLEDFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             self.mac = user_input[CONF_MAC]
             self.name = user_input["name"]
             await self.async_set_unique_id(format_mac(self.mac))
-            return await self.async_step_validate()
+            self._abort_if_unique_id_configured()
+            return self.async_create_entry(
+                title=self.name, data={CONF_MAC: self.mac, "name": self.name}
+            )
 
         return self.async_show_form(
             step_id="manual",
@@ -254,23 +229,6 @@ class BJLEDFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             ),
             errors={},
         )
-
-    async def toggle_light(self):
-        if not self._instance:
-            self._instance = BJLEDInstance(self.mac, False, 120, self.hass)
-        try:
-            await self._instance.update()
-            await self._instance.turn_on()
-            await asyncio.sleep(1)
-            await self._instance.turn_off()
-            await asyncio.sleep(1)
-            await self._instance.turn_on()
-            await asyncio.sleep(1)
-            await self._instance.turn_off()
-        except Exception as error:
-            return error
-        finally:
-            await self._instance.stop()
 
     @staticmethod
     @callback

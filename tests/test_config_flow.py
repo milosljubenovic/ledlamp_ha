@@ -1,7 +1,7 @@
 """Tests for config flow."""
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from homeassistant import config_entries
@@ -89,51 +89,3 @@ class TestBJLEDFlowHandler:
         # This test requires full Home Assistant setup with bluetooth
         pytest.skip("Requires full HA bluetooth setup")
 
-    @pytest.mark.asyncio
-    @patch("custom_components.leddmx.config_flow.BJLEDInstance")
-    async def test_validate_connection_success(
-        self, mock_instance_class, hass, mock_config_entry
-    ):
-        """Test successful validation."""
-        flow = BJLEDFlowHandler()
-        flow.hass = hass
-        flow.mac = "AA:BB:CC:DD:EE:FF"
-        flow.name = "Test Device"
-        
-        # Mock successful connection
-        mock_instance = AsyncMock()
-        mock_instance.update = AsyncMock()
-        mock_instance.turn_on = AsyncMock()
-        mock_instance.turn_off = AsyncMock()
-        mock_instance.stop = AsyncMock()
-        mock_instance_class.return_value = mock_instance
-        
-        result = await flow.toggle_light()
-        
-        assert result is None
-        mock_instance.update.assert_called_once()
-        mock_instance.turn_on.assert_called()
-        mock_instance.turn_off.assert_called()
-        mock_instance.stop.assert_called_once()
-
-    @pytest.mark.asyncio
-    @patch("custom_components.leddmx.config_flow.BJLEDInstance")
-    async def test_validate_connection_failure(
-        self, mock_instance_class, hass
-    ):
-        """Test failed validation."""
-        flow = BJLEDFlowHandler()
-        flow.hass = hass
-        flow.mac = "AA:BB:CC:DD:EE:FF"
-        flow.name = "Test Device"
-        
-        # Mock connection failure
-        mock_instance = AsyncMock()
-        mock_instance.update = AsyncMock(side_effect=Exception("Connection failed"))
-        mock_instance.stop = AsyncMock()
-        mock_instance_class.return_value = mock_instance
-        
-        result = await flow.toggle_light()
-        
-        assert result is not None
-        assert isinstance(result, Exception)

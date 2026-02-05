@@ -7,7 +7,7 @@ from typing import Any, TypeVar, cast
 
 from bleak.backends.device import BLEDevice
 from bleak.backends.service import BleakGATTServiceCollection
-from bleak.exc import BleakDBusError
+from bleak.exc import BleakDBusError, BleakError
 from bleak_retry_connector import (
     BLEAK_RETRY_EXCEPTIONS as BLEAK_EXCEPTIONS,
     BleakClientWithServiceCache,
@@ -342,5 +342,12 @@ class BJLEDInstance:
             self._client = None
             self._write_uuid = None
             if client and client.is_connected:
-                await client.disconnect()
+                try:
+                    await client.disconnect()
+                except (BleakDBusError, BleakError) as err:
+                    LOGGER.debug(
+                        "%s: Bluetooth reported error during disconnect (connection already closed): %s",
+                        self.name,
+                        err,
+                    )
             LOGGER.debug("%s: Disconnected", self.name)
