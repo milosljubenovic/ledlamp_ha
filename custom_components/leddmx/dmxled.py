@@ -26,11 +26,11 @@ from .effects import effects_dmx as EFFECT_MAP
 
 EFFECT_LIST = list(EFFECT_MAP.keys())
 
-NAME_ARRAY = ["LEDDMX-03-DD2B"]
+LEDDMX_NAME_PREFIX = "leddmx-"
 WRITE_CHARACTERISTIC_UUIDS = ["0000ffe1-0000-1000-8000-00805f9b34fb"]
 
-TURN_ON_CMD = [bytearray.fromhex("7b ff 07 00 00 ff 00 ff bf")]
-TURN_OFF_CMD = [bytearray.fromhex("7b ff 07 00 00 00 00 ff bf")]
+TURN_ON_CMD = bytearray.fromhex("7b ff 07 00 00 ff 00 ff bf")
+TURN_OFF_CMD = bytearray.fromhex("7b ff 07 00 00 00 00 ff bf")
 DEFAULT_ATTEMPTS = 3
 BLEAK_BACKOFF_TIME = 0.25
 RETRY_BACKOFF_EXCEPTIONS = BleakDBusError
@@ -137,22 +137,27 @@ class BJLEDInstance:
             self._mac,
         )
 
-    def _detect_model(self):
-        x = 0
-        for name in NAME_ARRAY:
-            if self._device.name.lower().startswith(name.lower()):
-                self._turn_on_cmd = TURN_ON_CMD[x]
-                self._turn_off_cmd = TURN_OFF_CMD[x]
-                return x
-            x = x + 1
+    def _detect_model(self) -> int:
+        device_name = (self._device.name or "").lower()
+        if device_name.startswith(LEDDMX_NAME_PREFIX):
+            self._turn_on_cmd = TURN_ON_CMD
+            self._turn_off_cmd = TURN_OFF_CMD
+            return 0
+        self._turn_on_cmd = TURN_ON_CMD
+        self._turn_off_cmd = TURN_OFF_CMD
+        return 0
 
     async def _write(self, data: bytearray):
         """Send command to device and read response."""
+        if data is None:
+            raise ValueError(f"{self.name}: Command data is None (device model may not be supported)")
         await self._ensure_connected()
         await self._write_while_connected(data)
 
     async def _write_while_connected(self, data: bytearray):
-        LOGGER.debug(f"Writing data to {self.name}: {data.hex()}")
+        if data is None:
+            return
+        LOGGER.debug("%s: Writing data: %s", self.name, data.hex())
         await self._client.write_gatt_char(self._write_uuid, data, False)
 
     @property
@@ -227,12 +232,12 @@ class BJLEDInstance:
 
     @retry_bluetooth_connection_error
     async def turn_on(self):
-        await self._write(self._turn_on_cmd)
+        await self._write(self._turn_on_cmd or TURN_ON_CMD)
         self._is_on = True
 
     @retry_bluetooth_connection_error
     async def turn_off(self):
-        await self._write(self._turn_off_cmd)
+        await self._write(self._turn_off_cmd or TURN_OFF_CMD)
         self._is_on = False
 
     @retry_bluetooth_connection_error
