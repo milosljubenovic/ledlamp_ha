@@ -16,7 +16,7 @@ def mock_config_entry():
     """Create a mock config entry."""
     entry = MagicMock(spec=ConfigEntry)
     entry.entry_id = "test_entry_id"
-    entry.data = {"mac": "AA:BB:CC:DD:EE:FF"}
+    entry.data = {"mac": "AA:BB:CC:DD:EE:FF", "name": "Test Device"}
     entry.options = {}
     entry.title = "Test Device"
     entry.add_update_listener = MagicMock(return_value=MagicMock())
@@ -62,7 +62,7 @@ async def test_async_setup_entry_with_options(
     
     assert result is True
     mock_bjled_class.assert_called_once_with(
-        "AA:BB:CC:DD:EE:FF", True, 60, hass
+        "AA:BB:CC:DD:EE:FF", "Test Device", True, 60, hass
     )
 
 

@@ -18,7 +18,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     delay = entry.options.get(CONF_DELAY, None) or entry.data.get(CONF_DELAY, None)
     LOGGER.debug("Config Reset data: %s and config delay data: %s", reset, delay)
 
-    instance = BJLEDInstance(entry.data[CONF_MAC], reset, delay, hass)
+    instance = BJLEDInstance(
+        entry.data[CONF_MAC],
+        entry.data.get("name", "LEDDMX"),
+        reset,
+        delay,
+        hass,
+    )
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = instance
 

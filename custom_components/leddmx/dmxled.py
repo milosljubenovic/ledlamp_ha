@@ -19,7 +19,6 @@ from bleak_retry_connector import (
 
 from homeassistant.components import bluetooth
 from homeassistant.components.light import ColorMode
-from homeassistant.exceptions import ConfigEntryNotReady
 
 LOGGER = logging.getLogger(__name__)
 
@@ -104,18 +103,17 @@ def retry_bluetooth_connection_error(func: WrapFuncType) -> WrapFuncType:
 
 
 class BJLEDInstance:
-    def __init__(self, address, reset: bool, delay: int, hass) -> None:
+    def __init__(
+        self, address: str, name: str, reset: bool, delay: int, hass
+    ) -> None:
         self.loop = asyncio.get_running_loop()
         self._mac = address
         self._reset = reset
         self._delay = delay
         self._hass = hass
-        self._device: BLEDevice | None = None
-        self._device = bluetooth.async_ble_device_from_address(self._hass, address)
-        if not self._device:
-            raise ConfigEntryNotReady(
-                f"You need to add bluetooth integration (https://www.home-assistant.io/integrations/bluetooth) or couldn't find a nearby device with address: {address}"
-            )
+        self._device: BLEDevice = bluetooth.async_ble_device_from_address(
+            self._hass, address
+        ) or BLEDevice(address, name or "LEDDMX", None)
         self._connect_lock: asyncio.Lock = asyncio.Lock()
         self._client: BleakClientWithServiceCache | None = None
         self._disconnect_timer: asyncio.TimerHandle | None = None
