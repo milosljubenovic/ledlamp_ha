@@ -252,16 +252,6 @@ class BJLEDInstance:
         await self._write(bytearray.fromhex(hex_cmd))
 
     @retry_bluetooth_connection_error
-    async def turn_on(self):
-        await self._write(self._turn_on_cmd)
-        self._is_on = True
-
-    @retry_bluetooth_connection_error
-    async def turn_off(self):
-        await self._write(self._turn_off_cmd)
-        self._is_on = False
-
-    @retry_bluetooth_connection_error
     async def update(self):
         LOGGER.debug("%s: Update in bjled called", self.name)
         # I dont think we have anything to update

@@ -30,7 +30,7 @@ class DeviceData(BluetoothData):
         # LOGGER.debug("Discovered bluetooth devices, DeviceData, : %s , %s", self._discovery.address, self._discovery.name)
 
     def supported(self):
-        return self._discovery.name.lower().startswith("LEDDMX-")
+        return self._discovery.name.lower().startswith("leddmx-")
 
     def address(self):
         return self._discovery.address
@@ -105,7 +105,7 @@ class BJLEDFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                     if each.address() == self.mac:
                         self.name = each.get_device_name()
             if self.name is None:
-                self.name = "BJ_LEDx"
+                self.name = "LEDDMX"
             await self.async_set_unique_id(self.mac, raise_on_progress=False)
             self._abort_if_unique_id_configured()
             return await self.async_step_validate()

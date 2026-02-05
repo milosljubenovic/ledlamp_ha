@@ -121,7 +121,7 @@ Add this repo to HACS as a custom repo.  Click through:
 - Choose category `Integration`
 - Click Add
 - Restart Home Assistant
-- BJ_LED devices should start to appear in your Integrations page
+- LEDDMX devices should start to appear in your Integrations page
 
 ## Credits
 
