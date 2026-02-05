@@ -2,15 +2,24 @@
   "domain": "leddmx",
   "name": "LEDDMX BLE",
   "bluetooth": [
-      { "local_name": "LEDDMX*" }
-    ],
-  "codeowners": ["@8none1"],
+    {
+      "local_name": "LEDDMX*"
+    }
+  ],
+  "codeowners": [
+    "@8none1"
+  ],
   "config_flow": true,
-  "dependencies": ["bluetooth"],
+  "dependencies": [
+    "bluetooth"
+  ],
   "documentation": "https://github.com/milosljubenovic/ledlamp_ha",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/milosljubenovic/ledlamp_ha/issues",
-  "requirements": ["bleak-retry-connector>=1.17.1","bleak>=0.17.0"],
-  "version": "0.0.1",
+  "requirements": [
+    "bleak-retry-connector>=1.17.1",
+    "bleak>=0.17.0"
+  ],
+  "version": "0.1.0",
   "integration_type": "device"
 }

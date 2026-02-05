@@ -24,7 +24,7 @@ LOGGER = logging.getLogger(__name__)
 
 from .effects import effects_dmx as EFFECT_MAP
 
-EFFECT_LIST = list(EFFECT_MAP.keys())
+EFFECT_LIST = ["None"] + list(EFFECT_MAP.keys())
 
 LEDDMX_NAME_PREFIX = "leddmx-"
 WRITE_CHARACTERISTIC_UUIDS = ["0000ffe1-0000-1000-8000-00805f9b34fb"]
@@ -246,7 +246,13 @@ class BJLEDInstance:
             LOGGER.error("Effect %s not supported", effect)
             return
         self._effect = effect
-        
+
+        if effect == "None":
+            self._effect = None
+            rgb = self._rgb_color or (255, 255, 255)
+            await self.set_rgb_color(rgb)
+            return
+
         effect_id = EFFECT_MAP.get(effect)
         hex_cmd = f"7b ff 03 {effect_id:02x} ff ff ff ff bf"
         LOGGER.debug("Effect ID: %s", effect_id)

@@ -123,6 +123,10 @@ Add this repo to HACS as a custom repo.  Click through:
 - Restart Home Assistant
 - LEDDMX devices should start to appear in your Integrations page
 
+### Switching Versions in HACS
+
+To install a specific version: HACS -> Integrations -> LEDDMX BLE -> Reinstall -> Select version from the dropdown. Versions correspond to git tags (e.g. v0.1.0).
+
 ## Credits
 
 This integration was possible thanks to the work done by raulgbcr in this repo:

@@ -67,6 +67,7 @@ async def test_effect_list_property(hass, mock_ble_device, mock_async_ble_device
     effect_list = instance.effect_list
     assert isinstance(effect_list, list)
     assert len(effect_list) > 0
+    assert effect_list[0] == "None"
     assert "AUTO" in effect_list
 
 
@@ -146,15 +147,30 @@ async def test_set_effect(
 
 
 @pytest.mark.asyncio
+async def test_set_effect_none(
+    hass, mock_ble_device, mock_async_ble_device_from_address,
+    mock_establish_connection, mock_bleak_client
+):
+    """Test set_effect with None clears effect and sends RGB."""
+    instance = BJLEDInstance("AA:BB:CC:DD:EE:FF", "LEDDMX-03-DD2B", False, 120, hass)
+    instance._rgb_color = (255, 128, 0)
+
+    await instance.set_effect("None")
+
+    assert instance._effect is None
+    mock_bleak_client.write_gatt_char.assert_called()
+
+
+@pytest.mark.asyncio
 async def test_set_effect_invalid(
     hass, mock_ble_device, mock_async_ble_device_from_address,
     mock_establish_connection, mock_bleak_client
 ):
     """Test set_effect with invalid effect."""
     instance = BJLEDInstance("AA:BB:CC:DD:EE:FF", "LEDDMX-03-DD2B", False, 120, hass)
-    
+
     await instance.set_effect("Invalid Effect")
-    
+
     mock_bleak_client.write_gatt_char.assert_not_called()
 
 
